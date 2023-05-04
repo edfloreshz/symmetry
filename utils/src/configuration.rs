@@ -8,9 +8,10 @@ use crate::color_scheme::ColorScheme;
 pub const APP_NAME: &str = "symmetry";
 pub const CONFIG_PATH: &str = "symmetry/configuration.toml";
 
-#[derive(Debug, Default, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, Default, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct Configuration {
-    pub color_scheme: ColorScheme
+    pub color_scheme: ColorScheme,
+    pub wallpaper: String
 }
 
 impl Configuration {
@@ -19,6 +20,21 @@ impl Configuration {
         Self::default()
     }
     
+    /// Gets the current configuration.
+    pub fn current() -> Option<Self> {
+        let data_dir = dirs::data_dir().context("Data directory not available.").ok();
+        if data_dir.is_none() {
+            return None;
+        }
+        if let Ok(data) = std::fs::read_to_string(data_dir.unwrap().join(CONFIG_PATH)) {
+            return match toml::from_str(data.as_str()) {
+                Ok(config) => Some(config),
+                Err(_) => None,
+            }
+        }
+        None
+    }
+
     /// Creates a new instance from a path.
     pub fn from(path: PathBuf) -> Self {
         let data = std::fs::read_to_string(path).unwrap();

@@ -1,12 +1,12 @@
-use cosmic::iced::Settings;
-use cosmic::iced_winit::Length;
-use cosmic::iced_winit::widget::horizontal_space;
-use cosmic::settings;
-use cosmic::widget::settings::{view_column, view_section, item};
-use cosmic::{Element, Theme};
-use cosmic::iced::widget::{row, radio};
-use cosmic::theme::ThemeType;
 use crate::app::{Message, Symmetry};
+use cosmic::iced::widget::{radio, row};
+use cosmic::iced::Settings;
+use cosmic::iced_winit::widget::horizontal_space;
+use cosmic::iced_winit::Length;
+use cosmic::settings;
+use cosmic::theme::ThemeType;
+use cosmic::widget::settings::{item, view_column, view_section};
+use cosmic::{Element, Theme};
 
 use super::Page;
 
@@ -15,17 +15,21 @@ pub fn view<'a>(app: &'a Symmetry) -> Element<'a, Message> {
     let preferences = view_column(vec![
         app.page_title(Page::Settings),
         view_section("Appearance")
-            .add(item("Color Scheme", row![
-                horizontal_space(Length::Fill),
-                radio("Light", ThemeType::Light, theme, Message::ThemeChanged),
-                radio("Dark", ThemeType::Dark, theme, Message::ThemeChanged),
-            ].spacing(10)))
-            .into()
+            .add(item(
+                "Color Scheme",
+                row![
+                    horizontal_space(Length::Fill),
+                    radio("Light", ThemeType::Light, theme, Message::ThemeChanged),
+                    radio("Dark", ThemeType::Dark, theme, Message::ThemeChanged),
+                ]
+                .spacing(10),
+            ))
+            .into(),
     ]);
     preferences.into()
 }
 
-fn evaluate_theme(theme: &Theme) -> ThemeType {
+pub fn evaluate_theme(theme: &Theme) -> ThemeType {
     theme.theme_type
 }
 

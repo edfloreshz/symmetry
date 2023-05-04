@@ -7,4 +7,5 @@ edition = "2021"
 
 [dependencies]
 libcosmic = { git = "https://github.com/pop-os/libcosmic" }
+once_cell = "1.17.1"
 symmetry_utils = { path = "../utils" }
