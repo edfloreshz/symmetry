@@ -1,8 +1,10 @@
 use app::Symmetry;
-use iced::{Application, Settings};
+use cosmic::iced::Application;
+use pages::settings::get_settings;
 
 mod app;
+mod pages;
 
-fn main() -> iced::Result {
-    Symmetry::run(Settings::default())
+fn main() -> cosmic::iced::Result {
+    Symmetry::run(get_settings())
 }

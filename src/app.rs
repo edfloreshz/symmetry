@@ -1,75 +1,95 @@
-use iced::{Sandbox, Alignment, Length, Theme, theme, Color};
-use iced::widget::{column, text, container, row, radio};
+use cosmic::iced_winit::widget::horizontal_space;
+use cosmic::widget::segmented_button::{Entity, SingleSelectModel, self};
+use cosmic::{iced, Element};
+use cosmic::iced_winit::Command;
+use cosmic::theme::ThemeType;
+use cosmic::widget::{nav_bar, IconSource};
+use cosmic::theme::Theme;
+use iced::{Application, Length};
+use iced::widget::{container, row};
+use crate::pages::Page;
 
+#[derive(Default)]
 pub struct Symmetry {
-    theme: Theme,
+    pub theme: Theme,
+    nav_bar: SingleSelectModel,
+    nav_id_to_page: segmented_button::SecondaryMap<Page>,
+    page: Page,
+}
+
+impl Symmetry {
+    /// Adds a page to the model we use for the navigation bar.
+    fn insert_page(&mut self, page: Page) -> segmented_button::SingleSelectEntityMut {
+        self.nav_bar
+            .insert()
+            .text(page.title())
+            .icon(IconSource::from(page.icon_name()))
+            .secondary(&mut self.nav_id_to_page, page)
+    }
+
+    fn page(&mut self, page: Page) {
+        self.page = page;
+    }
 }
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    ThemeChanged(ThemeType)
+    ThemeChanged(ThemeType),
+    NavBar(Entity)
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum ThemeType {
-    Light,
-    Dark,
-    Custom,
-}
-
-impl Sandbox for Symmetry {
+impl Application for Symmetry {
+    type Executor = cosmic::executor::Default;
+    type Flags = ();
     type Message = Message;
+    type Theme = Theme;
     
-    fn new() -> Self {
-        Self { theme: Theme::Dark }
+    fn new(_flags: ()) -> (Self, Command<Self::Message>) {
+        let mut model = Self::default();
+        model.theme = Theme::light();
+
+        model.insert_page(Page::Welcome).activate();
+        model.insert_page(Page::Settings);
+
+        (model, Command::none())
     }
     
     fn title(&self) -> String {
         String::from("Symmetry")
     }
     
-    fn update(&mut self, message: Self::Message) {
+    fn update(&mut self, message: Self::Message) -> cosmic::iced::Command<Self::Message> {
         match message {
             Message::ThemeChanged(theme) => self.theme = match theme {
-                ThemeType::Light => Theme::Light,
-                ThemeType::Dark => Theme::Dark,
-                ThemeType::Custom => Theme::custom(theme::Palette {
-                    background: Color::from_rgb(1.0, 0.9, 1.0),
-                    text: Color::BLACK,
-                    primary: Color::from_rgb(0.5, 0.5, 0.0),
-                    success: Color::from_rgb(0.0, 1.0, 0.0),
-                    danger: Color::from_rgb(1.0, 0.0, 0.0),
-                }),
+                ThemeType::Light => Theme::light(),
+                ThemeType::Dark => Theme::dark(),
+                ThemeType::HighContrastDark => Theme::dark_hc(),
+                ThemeType::HighContrastLight => Theme::light_hc(),
+            },
+            Message::NavBar(key) => {
+                if let Some(page) = self.nav_id_to_page.get(key).copied() {
+                    self.nav_bar.activate(key);
+                    self.page(page);
+                }
             },
         }
+        Command::none()
     }
     
-    fn view(&self) -> iced::Element<'_, Self::Message> {
+    fn view(&self) -> Element<Message> {
+        let nav_bar: Element<_> = nav_bar(&self.nav_bar, Message::NavBar).max_width(300).into();
+        let content: Element<_> = match self.page {
+            Page::Welcome => crate::pages::welcome::view(),
+            Page::Settings => crate::pages::settings::view(&self),
+        };
+
         container(
-            column![
-                text("Symmetry").size(50),
-                text("Symmetry is a service that ensures your settings remain consistent across all your devices. ").size(20),
-                row![
-                    radio("Light", ThemeType::Light, Some(match self.theme {
-                        Theme::Light => ThemeType::Light,
-                        Theme::Dark => ThemeType::Dark,
-                        Theme::Custom { .. } => ThemeType::Custom
-                    }), Message::ThemeChanged),
-                    radio("Dark", ThemeType::Dark, Some(match self.theme {
-                        Theme::Light => ThemeType::Light,
-                            Theme::Dark => ThemeType::Dark,
-                            Theme::Custom { .. } => ThemeType::Custom
-                    }), Message::ThemeChanged),
-                    radio("Custom", ThemeType::Custom, Some(match self.theme {
-                        Theme::Light => ThemeType::Light,
-                            Theme::Dark => ThemeType::Dark,
-                            Theme::Custom { .. } => ThemeType::Custom
-                    }), Message::ThemeChanged),
-                ]
-                .spacing(10)
+            row![
+                nav_bar,
+                horizontal_space(Length::Fill),
+                content,
+                horizontal_space(Length::Fill),
             ]
-            .spacing(10)
-            .align_items(Alignment::Center)
         )
         .width(Length::Fill)
         .height(Length::Fill)
@@ -77,7 +97,7 @@ impl Sandbox for Symmetry {
         .padding(20)
         .into()
     }
-    
+
     fn theme(&self) -> Theme {
         self.theme.clone()
     }
