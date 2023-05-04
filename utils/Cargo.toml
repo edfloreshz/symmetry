@@ -1,10 +1,13 @@
 [package]
-name = "symmetry_ui"
+name = "symmetry_utils"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-libcosmic = { git = "https://github.com/pop-os/libcosmic" }
-symmetry_utils = { path = "../utils" }
+anyhow = "1.0.71"
+dark-light = "1.0.0"
+toml = "0.7.3"
+serde = { version = "1.0.160", features = ["serde_derive"] }
+dirs = "5.0.1"
