@@ -1,0 +1,16 @@
+{
+    "configurations": [
+        {
+            "type": "cargo",
+            "name": "Run Symmetry UI",
+            "cargoArgs": ["run", "--release"],
+            "workingDir": "ui/",
+        },
+        {
+            "type": "cargo",
+            "name": "Test Symmetry Utils",
+            "cargoArgs": ["test"],
+            "workingDir": "utils/",
+        },
+    ]
+}

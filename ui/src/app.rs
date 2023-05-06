@@ -1,16 +1,16 @@
-use crate::pages::{Page, desktop};
-use cosmic::iced::widget::text;
-use cosmic::iced::window;
+use crate::pages::{desktop, Page};
+use crate::widgets::header_bar::header;
+use ashpd::desktop::file_chooser::OpenFileRequest;
+use ashpd::WindowIdentifier;
+use cosmic::iced::{window, Application};
 use cosmic::iced_winit::widget::horizontal_space;
 use cosmic::iced_winit::window::{close, drag, minimize, toggle_maximize};
-use cosmic::iced_winit::Command;
-use cosmic::theme::Theme;
+use cosmic::iced_winit::{column, row, Command};
 use cosmic::theme::ThemeType;
 use cosmic::widget::segmented_button::{self, Entity, SingleSelectModel};
-use cosmic::widget::{header_bar, nav_bar, IconSource};
-use cosmic::{iced, Element};
-use iced::widget::{column, row};
-use iced::{Application, Length};
+use cosmic::widget::{nav_bar, text, IconSource};
+use cosmic::{iced, Element, Theme};
+use iced::Length;
 use symmetry_utils::configuration::Configuration;
 
 #[derive(Default)]
@@ -21,7 +21,7 @@ pub struct Symmetry {
     page: Page,
     error: String,
     show_warning: bool,
-    desktop: crate::pages::desktop::State
+    desktop: crate::pages::desktop::State,
 }
 
 impl Symmetry {
@@ -53,9 +53,13 @@ impl Symmetry {
 #[derive(Debug, Clone)]
 pub enum Message {
     ThemeChanged(ThemeType),
-    NavBar(Entity),
     Desktop(desktop::Message),
+    SwitchColorScheme,
+    HandlePickedFile(Vec<String>),
+    NavBar(Entity),
     ToggleWarning,
+    Error(String),
+    Initialize,
     Maximize,
     Minimize,
     Close,
@@ -77,7 +81,8 @@ impl Application for Symmetry {
             model.desktop = desktop::State::new(config.wallpaper, Some(config.color_scheme));
         }
 
-        model.insert_page(Page::Desktop).activate();
+        model.insert_page(Page::Welcome).activate();
+        model.insert_page(Page::Desktop);
         model.insert_page(Page::Settings);
 
         (model, Command::none())
@@ -87,12 +92,41 @@ impl Application for Symmetry {
         String::from("Symmetry")
     }
 
+    fn view(&self) -> Element<Message> {
+        let header = header(self.title());
+
+        let nav_bar: Element<_> = nav_bar(&self.nav_bar, Message::NavBar)
+            .max_width(200)
+            .into();
+        let page: Element<_> = match self.page {
+            Page::Welcome => crate::pages::welcome::view(),
+            Page::Desktop => self.desktop.view(&self).map(Message::Desktop),
+            Page::Settings => crate::pages::settings::view(&self),
+        };
+        let content = row![
+            nav_bar,
+            horizontal_space(Length::Fill),
+            page,
+            horizontal_space(Length::Fill)
+        ]
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .padding(10);
+
+        if self.show_warning {
+            let warning = cosmic::widget::warning(&self.error).on_close(Message::ToggleWarning);
+            column![header, warning, content].into()
+        } else {
+            column![header, content].into()
+        }
+    }
+
     fn update(&mut self, message: Self::Message) -> cosmic::iced::Command<Self::Message> {
         match message {
             Message::ThemeChanged(theme) => {
                 self.theme = match theme {
-                    ThemeType::Light => Theme::light(),
                     ThemeType::Dark => Theme::dark(),
+                    ThemeType::Light => Theme::light(),
                     ThemeType::HighContrastDark => Theme::dark_hc(),
                     ThemeType::HighContrastLight => Theme::light_hc(),
                 }
@@ -102,7 +136,7 @@ impl Application for Symmetry {
                     self.nav_bar.activate(key);
                     self.page(page);
                 }
-            },
+            }
             Message::Drag => return drag(window::Id::new(0)),
             Message::Close => return close(window::Id::new(0)),
             Message::Minimize => return minimize(window::Id::new(0), true),
@@ -110,6 +144,7 @@ impl Application for Symmetry {
             Message::ToggleWarning => self.toggle_warning(),
             Message::Desktop(message) => match self.desktop.update(message) {
                 Some(desktop::Output::WallpaperInputChanged(path)) => {
+                    println!("REACHED");
                     let config = Configuration::current();
                     if let Some(mut config) = config {
                         config.wallpaper = path;
@@ -118,15 +153,7 @@ impl Application for Symmetry {
                             Err(err) => self.error = err.to_string(),
                         }
                     }
-                },
-                Some(desktop::Output::Initialize) => {
-                    let config = Configuration::new();
-                    match config.init() {
-                        Ok(_) => self.error = "Configuration created".to_string(),
-                        Err(err) => self.error = err.to_string(),
-                    }
-                    self.toggle_warning()
-                },
+                }
                 Some(desktop::Output::ColorSchemeChanged(color_scheme)) => {
                     let config = Configuration::current();
                     if let Some(mut config) = config {
@@ -137,43 +164,54 @@ impl Application for Symmetry {
                         }
                     }
                 }
+                Some(desktop::Output::OpenFilePicker) => {
+                    let request = OpenFileRequest::default()
+                        .directory(false)
+                        .identifier(Some(WindowIdentifier::None))
+                        .modal(true)
+                        .title("Select your wallpaper")
+                        .multiple(false)
+                        .accept_label("Pick wallpaper");
+
+                    return Command::perform(request.send(), |response| match response {
+                        Ok(request) => match request.response() {
+                            Ok(files) => {
+                                let files: Vec<String> =
+                                    files.uris().iter().map(|s| s.to_string()).collect();
+                                return Message::HandlePickedFile(files);
+                            }
+                            Err(err) => Message::Error(err.to_string()),
+                        },
+                        Err(err) => Message::Error(err.to_string()),
+                    });
+                }
                 None => (),
             },
+            Message::SwitchColorScheme => {
+                self.theme = match self.theme.theme_type {
+                    ThemeType::Dark => Theme::light(),
+                    ThemeType::Light => Theme::dark(),
+                    ThemeType::HighContrastDark => Theme::light_hc(),
+                    ThemeType::HighContrastLight => Theme::dark_hc(),
+                }
+            }
+            Message::HandlePickedFile(files) => {
+                let file = files.first().unwrap().replace("file://", "");
+                self.desktop
+                    .update(desktop::Message::WallpaperChanged(file.clone()));
+                self.update(Message::Desktop(desktop::Message::WallpaperChanged(file)));
+            }
+            Message::Error(error) => eprintln!("{error}"),
+            Message::Initialize => {
+                let config = Configuration::new();
+                match config.init() {
+                    Ok(_) => self.error = "Configuration created".to_string(),
+                    Err(err) => self.error = err.to_string(),
+                }
+                self.toggle_warning()
+            }
         }
         Command::none()
-    }
-
-    fn view(&self) -> Element<Message> {
-        let header = header_bar()
-            .title(self.title())
-            .on_close(Message::Close)
-            .on_drag(Message::Drag)
-            .on_maximize(Message::Maximize)
-            .on_minimize(Message::Minimize);
-
-        let nav_bar: Element<_> = nav_bar(&self.nav_bar, Message::NavBar)
-            .max_width(200)
-            .into();
-        let pages: Element<_> = match self.page {
-            Page::Desktop => self.desktop.view(&self).map(Message::Desktop),
-            Page::Settings => crate::pages::settings::view(&self),
-        };
-        let content = row![
-            nav_bar,
-            horizontal_space(Length::Fill),
-            pages,
-            horizontal_space(Length::Fill)
-        ]
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .padding(20);
-
-        if self.show_warning {
-            let warning = cosmic::widget::warning(&self.error).on_close(Message::ToggleWarning);
-            column![header, warning, content].into()
-        } else {
-            column![header, content].into()
-        }
     }
 
     fn theme(&self) -> Theme {

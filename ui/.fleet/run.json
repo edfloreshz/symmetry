@@ -1,9 +1,0 @@
-{
-    "configurations": [
-        {
-            "type": "cargo",
-            "name": "Symmetry UI",
-            "cargoArgs": ["run", "--release"],
-        },
-    ]
-}

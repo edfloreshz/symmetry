@@ -1,5 +1,5 @@
 use crate::app::{Message, Symmetry};
-use cosmic::iced::widget::{radio, row};
+use cosmic::iced::widget::{radio, row, text};
 use cosmic::iced::Settings;
 use cosmic::iced_winit::widget::horizontal_space;
 use cosmic::iced_winit::Length;
@@ -14,6 +14,9 @@ pub fn view<'a>(app: &'a Symmetry) -> Element<'a, Message> {
     let theme = Some(evaluate_theme(&app.theme));
     let preferences = view_column(vec![
         app.page_title(Page::Settings),
+        text("The settings page allows you to tailor your application experience to your preferences.")
+            .size(16)
+            .into(),
         view_section("Appearance")
             .add(item(
                 "Color Scheme",

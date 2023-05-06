@@ -1,8 +1,11 @@
 pub mod desktop;
 pub mod settings;
+pub mod welcome;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Default, Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Page {
+    #[default]
+    Welcome,
     Desktop,
     Settings,
 }
@@ -11,6 +14,7 @@ impl Page {
     pub fn title(&self) -> &'static str {
         use Page::*;
         match self {
+            Welcome => "Welcome",
             Desktop => "Desktop",
             Settings => "Settings",
         }
@@ -19,14 +23,9 @@ impl Page {
     pub fn icon_name(&self) -> &'static str {
         use Page::*;
         match self {
-            Desktop => "system-users-symbolic",
-            Settings => "document-properties-symbolic",
+            Welcome => "face-smile-big-symbolic",
+            Desktop => "computer-symbolic",
+            Settings => "preferences-system-symbolic",
         }
-    }
-}
-
-impl Default for Page {
-    fn default() -> Self {
-        Page::Desktop
     }
 }
