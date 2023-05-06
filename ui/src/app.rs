@@ -1,17 +1,22 @@
+use std::sync::atomic::{AtomicU32, Ordering};
+
 use crate::pages::{desktop, Page};
 use crate::widgets::header_bar::header;
 use ashpd::desktop::file_chooser::OpenFileRequest;
 use ashpd::WindowIdentifier;
-use cosmic::iced::{window, Application};
+use cosmic::iced::Application;
 use cosmic::iced_winit::widget::horizontal_space;
-use cosmic::iced_winit::window::{close, drag, minimize, toggle_maximize};
-use cosmic::iced_winit::{column, row, Command};
+use cosmic::iced_winit::window::{self, close, drag, minimize, toggle_maximize};
+use cosmic::iced_winit::{column, row, subscription, Command};
 use cosmic::theme::ThemeType;
 use cosmic::widget::segmented_button::{self, Entity, SingleSelectModel};
 use cosmic::widget::{nav_bar, text, IconSource};
 use cosmic::{iced, Element, Theme};
 use iced::Length;
 use symmetry_utils::configuration::Configuration;
+
+static WINDOW_WIDTH: AtomicU32 = AtomicU32::new(1000);
+const BREAK_POINT: u32 = 700;
 
 #[derive(Default)]
 pub struct Symmetry {
@@ -41,17 +46,22 @@ impl Symmetry {
 
     /// Return the title of the selected page.
     pub fn page_title<Message: 'static>(&self, page: Page) -> Element<Message> {
-        row!(text(page.title()).size(30), horizontal_space(Length::Fill),).into()
+        row!(text(page.title()).size(30), horizontal_space(Length::Fill)).into()
     }
 
     /// Toggles the warning.
     fn toggle_warning(&mut self) {
         self.show_warning = !self.show_warning
     }
+
+    fn is_condensed(&self) -> bool {
+        WINDOW_WIDTH.load(Ordering::Relaxed) < BREAK_POINT
+    }
 }
 
 #[derive(Debug, Clone)]
 pub enum Message {
+    CondensedViewToggle,
     ThemeChanged(ThemeType),
     Desktop(desktop::Message),
     SwitchColorScheme,
@@ -92,6 +102,31 @@ impl Application for Symmetry {
         String::from("Symmetry")
     }
 
+    fn subscription(&self) -> cosmic::iced_winit::Subscription<Self::Message> {
+        let window_break = subscription::events_with(|event, _| match event {
+            cosmic::iced::Event::Window(
+                _window_id,
+                window::Event::Resized { width, height: _ },
+            ) => {
+                let old_width = WINDOW_WIDTH.load(Ordering::Relaxed);
+                if old_width == 0
+                    || old_width < BREAK_POINT && width > BREAK_POINT
+                    || old_width > BREAK_POINT && width < BREAK_POINT
+                {
+                    WINDOW_WIDTH.store(width, Ordering::Relaxed);
+                    Some(())
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        });
+
+        cosmic::iced_winit::Subscription::batch(vec![
+            window_break.map(|_| Message::CondensedViewToggle)
+        ])
+    }
+
     fn view(&self) -> Element<Message> {
         let header = header(self.title());
 
@@ -103,15 +138,26 @@ impl Application for Symmetry {
             Page::Desktop => self.desktop.view(&self).map(Message::Desktop),
             Page::Settings => crate::pages::settings::view(&self),
         };
-        let content = row![
-            nav_bar,
-            horizontal_space(Length::Fill),
-            page,
-            horizontal_space(Length::Fill)
-        ]
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .padding(10);
+
+        let widgets: Vec<Element<_>> = if self.is_condensed() {
+            vec![
+                horizontal_space(Length::Fill).into(),
+                page,
+                horizontal_space(Length::Fill).into(),
+            ]
+        } else {
+            vec![
+                nav_bar,
+                horizontal_space(Length::Fill).into(),
+                page,
+                horizontal_space(Length::Fill).into(),
+            ]
+        };
+
+        let content = cosmic::iced::widget::row(widgets)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .padding(20);
 
         if self.show_warning {
             let warning = cosmic::widget::warning(&self.error).on_close(Message::ToggleWarning);
@@ -209,6 +255,7 @@ impl Application for Symmetry {
                 }
                 self.toggle_warning()
             }
+            Message::CondensedViewToggle => {}
         }
         Command::none()
     }
