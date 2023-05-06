@@ -1,12 +1,19 @@
 use crate::app::Message;
 use cosmic::iced::widget::{button, column, container, text};
+use cosmic::iced_winit::svg::Handle;
+use cosmic::iced_winit::widget::Svg;
 use cosmic::iced_winit::Alignment;
 use cosmic::Element;
 use symmetry_utils::configuration::Configuration;
+use symmetry_utils::resources::Resources;
 
 pub fn view<'a>() -> Element<'a, Message> {
     let config = Configuration::current();
+    let icon = Resources::get("icon/dev.edfloreshz.Symmetry.svg")
+        .unwrap()
+        .data;
     let mut widgets: Vec<Element<_>> = vec![
+        Svg::new(Handle::from_memory(icon)).into(),
         text("Symmetry").size(50).into(),
         text("Symmetry is a service that ensures your settings remain consistent across all your devices.")
             .size(20)

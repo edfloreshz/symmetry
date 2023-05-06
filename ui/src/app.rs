@@ -144,7 +144,6 @@ impl Application for Symmetry {
             Message::ToggleWarning => self.toggle_warning(),
             Message::Desktop(message) => match self.desktop.update(message) {
                 Some(desktop::Output::WallpaperInputChanged(path)) => {
-                    println!("REACHED");
                     let config = Configuration::current();
                     if let Some(mut config) = config {
                         config.wallpaper = path;

@@ -1,15 +1,14 @@
 use super::Page;
 use crate::app::Symmetry;
-use cosmic::iced::widget::{button, column, radio, text, text_input};
+use cosmic::iced::widget::{button, radio, text, text_input, Image};
 use cosmic::iced_winit::widget::horizontal_space;
-use cosmic::iced_winit::{row, Alignment, Length};
-use cosmic::theme::Svg;
+use cosmic::iced_winit::{row, Length};
+use cosmic::theme;
 use cosmic::widget::settings::{item, view_column, view_section};
-use cosmic::widget::{icon, IconSource};
+use cosmic::widget::{icon, scrollable, IconSource};
 use cosmic::Element;
 use once_cell::sync::Lazy;
 use symmetry_utils::color_scheme::ColorScheme;
-use symmetry_utils::configuration::Configuration;
 
 static INPUT_ID: Lazy<text_input::Id> = Lazy::new(text_input::Id::unique);
 
@@ -41,7 +40,6 @@ impl State {
     }
 
     pub fn view<'a>(&'a self, app: &'a Symmetry) -> Element<'a, Message> {
-        let config = Configuration::current();
         let wallpaper_entry: Element<Message> = text_input(
             "Paste the wallpaper path or URL here.",
             &self.wallpaper,
@@ -61,12 +59,16 @@ impl State {
                     wallpaper_entry,
                     button(
                         icon(IconSource::from("document-open-symbolic"), 16)
-                            .style(Svg::SymbolicPrimary)
+                            .style(theme::Svg::SymbolicPrimary)
                     )
                     .padding(10)
                     .on_press(Message::OpenFilePicker)
                 ]
                 .spacing(10),
+            ))
+            .add(item(
+                "Preview",
+                Image::new(&self.wallpaper).width(Length::FillPortion(20)),
             ))
             .into();
         let appearance = view_section("Appearance")
@@ -104,15 +106,7 @@ impl State {
             wallpaper,
             appearance
         ];
-        let mut widgets: Vec<Element<Message>> = vec![];
-        if config.is_none() {
-        } else {
-            widgets.push(view_column(settings).into())
-        }
-        column(widgets)
-            .spacing(10)
-            .align_items(Alignment::Center)
-            .into()
+        scrollable(view_column(settings)).into()
     }
 
     pub fn update(&mut self, message: Message) -> Option<Output> {

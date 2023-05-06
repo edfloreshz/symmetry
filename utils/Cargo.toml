@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.71"
 dark-light = "1.0.0"
+rust-embed = "6.6.1"
 toml = "0.7.3"
 serde = { version = "1.0.160", features = ["serde_derive"] }
 dirs = "5.0.1"
