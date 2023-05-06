@@ -38,14 +38,15 @@ impl State {
     pub fn view<'a>(&'a self, app: &'a Symmetry) -> Element<'a, Message> {
         let wallpaper = wallpaper_section(self.wallpaper.clone());
         let appearance = appearance_section(self.selected_color_scheme);
-        scrollable(view_column(vec![
+        let desktop: Element<'a, Message> = view_column(vec![
             app.page_title(Page::Desktop),
             text("The desktop preferences section allows you to customize and personalize your desktop environment to suit your unique preferences and workflow.")
                 .size(16)
                 .into(),
             wallpaper,
             appearance
-        ])).into()
+        ]).into();
+        scrollable(desktop).into()
     }
 
     pub fn update(&mut self, message: Message) -> Option<Output> {

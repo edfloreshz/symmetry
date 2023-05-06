@@ -1,6 +1,6 @@
 use std::sync::atomic::{AtomicU32, Ordering};
 
-use crate::pages::{desktop, Page};
+use crate::pages::{desktop, welcome, Page};
 use crate::widgets::header_bar::header;
 use ashpd::desktop::file_chooser::OpenFileRequest;
 use ashpd::WindowIdentifier;
@@ -14,6 +14,7 @@ use cosmic::widget::{nav_bar, text, IconSource};
 use cosmic::{iced, Element, Theme};
 use iced::Length;
 use symmetry_utils::configuration::Configuration;
+use symmetry_utils::sync::SyncManager;
 
 static WINDOW_WIDTH: AtomicU32 = AtomicU32::new(1000);
 const BREAK_POINT: u32 = 700;
@@ -27,6 +28,7 @@ pub struct Symmetry {
     error: String,
     show_warning: bool,
     desktop: crate::pages::desktop::State,
+    welcome: crate::pages::welcome::State,
 }
 
 impl Symmetry {
@@ -64,16 +66,17 @@ pub enum Message {
     CondensedViewToggle,
     ThemeChanged(ThemeType),
     Desktop(desktop::Message),
+    Welcome(welcome::Message),
     SwitchColorScheme,
     HandlePickedFile(Vec<String>),
     NavBar(Entity),
     ToggleWarning,
     Error(String),
-    Initialize,
     Maximize,
     Minimize,
     Close,
     Drag,
+    Sync,
 }
 
 impl Application for Symmetry {
@@ -129,30 +132,24 @@ impl Application for Symmetry {
 
     fn view(&self) -> Element<Message> {
         let header = header(self.title());
-
         let nav_bar: Element<_> = nav_bar(&self.nav_bar, Message::NavBar)
             .max_width(200)
             .into();
         let page: Element<_> = match self.page {
-            Page::Welcome => crate::pages::welcome::view(),
+            Page::Welcome => self.welcome.view().map(Message::Welcome),
             Page::Desktop => self.desktop.view(&self).map(Message::Desktop),
             Page::Settings => crate::pages::settings::view(&self),
         };
 
-        let widgets: Vec<Element<_>> = if self.is_condensed() {
-            vec![
-                horizontal_space(Length::Fill).into(),
-                page,
-                horizontal_space(Length::Fill).into(),
-            ]
-        } else {
-            vec![
-                nav_bar,
-                horizontal_space(Length::Fill).into(),
-                page,
-                horizontal_space(Length::Fill).into(),
-            ]
-        };
+        let mut widgets: Vec<Element<_>> = vec![
+            horizontal_space(Length::Fill).into(),
+            page,
+            horizontal_space(Length::Fill).into(),
+        ];
+
+        if !self.is_condensed() {
+            widgets.insert(0, nav_bar);
+        }
 
         let content = cosmic::iced::widget::row(widgets)
             .width(Length::Fill)
@@ -188,6 +185,17 @@ impl Application for Symmetry {
             Message::Minimize => return minimize(window::Id::new(0), true),
             Message::Maximize => return toggle_maximize(window::Id::new(0)),
             Message::ToggleWarning => self.toggle_warning(),
+            Message::Welcome(message) => match self.welcome.update(message) {
+                Some(welcome::Output::Initialize(repository)) => {
+                    let config = Configuration::new();
+                    match config.init(repository) {
+                        Ok(_) => self.error = "Configuration created".to_string(),
+                        Err(err) => self.error = err.to_string(),
+                    }
+                    self.toggle_warning()
+                }
+                None => (),
+            },
             Message::Desktop(message) => match self.desktop.update(message) {
                 Some(desktop::Output::WallpaperInputChanged(path)) => {
                     let config = Configuration::current();
@@ -247,15 +255,17 @@ impl Application for Symmetry {
                 self.update(Message::Desktop(desktop::Message::WallpaperChanged(file)));
             }
             Message::Error(error) => eprintln!("{error}"),
-            Message::Initialize => {
-                let config = Configuration::new();
-                match config.init() {
-                    Ok(_) => self.error = "Configuration created".to_string(),
-                    Err(err) => self.error = err.to_string(),
-                }
-                self.toggle_warning()
-            }
             Message::CondensedViewToggle => {}
+            Message::Sync => match SyncManager::sync() {
+                Ok(_) => {
+                    self.error = "Synchronization successful.".into();
+                    self.toggle_warning()
+                }
+                Err(err) => {
+                    self.error = err.to_string();
+                    self.toggle_warning()
+                }
+            },
         }
         Command::none()
     }
