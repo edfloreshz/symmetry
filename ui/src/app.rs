@@ -29,6 +29,7 @@ pub struct Symmetry {
     show_warning: bool,
     desktop: crate::pages::desktop::State,
     welcome: crate::pages::welcome::State,
+    sync: SyncManager,
 }
 
 impl Symmetry {
@@ -256,16 +257,37 @@ impl Application for Symmetry {
             }
             Message::Error(error) => eprintln!("{error}"),
             Message::CondensedViewToggle => {}
-            Message::Sync => match SyncManager::sync() {
-                Ok(_) => {
-                    self.error = "Synchronization successful.".into();
-                    self.toggle_warning()
+            Message::Sync => {
+                match self.sync.sync() {
+                    Ok(status) => match status {
+                        symmetry_utils::sync::SyncStatus::UpToDate => {
+                            self.error = "Already up to date.".into();
+                            self.toggle_warning()
+                        }
+                        symmetry_utils::sync::SyncStatus::ChangesUploaded => {
+                            self.error = "Successfully synchronized.".into();
+                            self.toggle_warning()
+                        }
+                        symmetry_utils::sync::SyncStatus::NewChangesDetected => {
+                            // todo!("Check if there are conflicts, if not, pull changes");
+                            match self.sync.pull() {
+                                Ok(_) => {
+                                    self.error = "Latest changes downloaded.".into();
+                                    self.toggle_warning()
+                                }
+                                Err(err) => {
+                                    self.error = format!("An error ocurred while trying to get the latest changes: {}.", err).into();
+                                    self.toggle_warning()
+                                }
+                            }
+                        }
+                    },
+                    Err(err) => {
+                        self.error = err.to_string();
+                        self.toggle_warning()
+                    }
                 }
-                Err(err) => {
-                    self.error = err.to_string();
-                    self.toggle_warning()
-                }
-            },
+            }
         }
         Command::none()
     }
