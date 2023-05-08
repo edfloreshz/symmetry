@@ -1,6 +1,7 @@
 use anyhow::Result;
-use git2::{BranchType, PushOptions, Repository, Signature, StatusOptions};
+use git2::{BranchType, MergeOptions, PushOptions, Repository, Signature, StatusOptions};
 use git2_credentials::CredentialHandler;
+use native_dialog::{MessageDialog, MessageType};
 
 use crate::configuration::Configuration;
 
@@ -30,6 +31,7 @@ impl SyncManager {
     pub fn sync(&self) -> Result<SyncStatus> {
         let mut options = StatusOptions::new();
         options.include_untracked(true);
+        self.set_upstream_branch()?;
 
         let status = if !self.repo.statuses(Some(&mut options))?.is_empty() {
             self.pull()?;
@@ -99,6 +101,27 @@ impl SyncManager {
         Ok(())
     }
 
+    pub fn set_upstream_branch(&self) -> Result<()> {
+        let branch_name = "main";
+
+        let mut branch = self.repo.find_branch(branch_name, BranchType::Local)?;
+
+        // Check if the branch already has an upstream branch
+        if branch.upstream().is_err() {
+            let upstream_name = "origin/main"; // Replace with the desired upstream branch name
+
+            let upstream_branch = self.repo.find_branch(upstream_name, BranchType::Remote)?;
+
+            branch.set_upstream(upstream_branch.name()?)?;
+
+            println!("Upstream branch set successfully.");
+        } else {
+            println!("Upstream branch is already set.");
+        }
+
+        Ok(())
+    }
+
     pub fn pull(&self) -> Result<()> {
         let branch_name = "main";
         let local_branch = self.repo.find_branch(branch_name, BranchType::Local)?;
@@ -134,6 +157,9 @@ impl SyncManager {
                 .repo
                 .reference_to_annotated_commit(&upstream.into_reference())?;
 
+            let mut merge_options = MergeOptions::new();
+            merge_options.fail_on_conflict(false);
+
             let analysis = self.repo.merge_analysis(&[&remote_annotated_commit])?;
             if analysis.0.is_up_to_date() {
                 println!("Already up to date, no changes to pull.");
@@ -146,11 +172,76 @@ impl SyncManager {
                     .checkout_head(Some(git2::build::CheckoutBuilder::default().force()))?;
                 println!("Pull completed successfully.");
             } else {
-                let merge_commit = self
-                    .repo
-                    .merge_commits(&local_commit, &remote_commit, None)?;
-                // Handle merge conflicts if necessary
-                println!("Pull completed successfully.");
+                let index =
+                    self.repo
+                        .merge_commits(&local_commit, &remote_commit, Some(&merge_options))?;
+                if index.has_conflicts() {
+                    let yes = MessageDialog::new()
+                        .set_type(MessageType::Info)
+                        .set_title("Conflict")
+                        .set_text("There are two conflicting configuration files, which one would you like to keep?")
+                        .set_labels("Latest", "Current")
+                        .show_confirm()
+                        .unwrap();
+                    if yes {
+                        // Perform the merge with the "theirs" strategy
+                        let reference = self.repo.find_reference("FETCH_HEAD")?; // TODO: How do I make this work?
+                        let fetch_commit = self.repo.reference_to_annotated_commit(&reference)?;
+                        let mut merge_options = MergeOptions::new();
+                        self.repo
+                            .merge(&[&fetch_commit], Some(&mut merge_options), None)?;
+
+                        // Commit the merge result
+                        let signature = self.repo.signature()?;
+                        let tree_oid = self.repo.index()?.write_tree()?;
+                        let tree = self.repo.find_tree(tree_oid)?;
+                        let parent_commit =
+                            self.repo.find_commit(self.repo.head()?.target().unwrap())?;
+                        let message = "Merge changes from remote branch";
+                        self.repo.commit(
+                            Some("HEAD"),
+                            &signature,
+                            &signature,
+                            message,
+                            &tree,
+                            &[&parent_commit],
+                        )?;
+
+                        println!("Merge completed successfully.");
+                    } else {
+                        // Perform the merge with the "ours" strategy
+                        let reference = self.repo.find_reference("FETCH_HEAD")?;
+                        let fetch_commit = self.repo.reference_to_annotated_commit(&reference)?;
+                        let mut merge_options = MergeOptions::new();
+                        self.repo
+                            .merge(&[&fetch_commit], Some(&mut merge_options), None)?;
+
+                        // Perform "ours" operation
+                        let mut checkout_options = git2::build::CheckoutBuilder::new();
+                        checkout_options.force();
+
+                        self.repo.checkout_head(Some(&mut checkout_options))?;
+                        self.repo.index()?.write()?;
+
+                        // Commit the merge result
+                        let signature = self.repo.signature()?;
+                        let tree_oid = self.repo.index()?.write_tree()?;
+                        let tree = self.repo.find_tree(tree_oid)?;
+                        let parent_commit =
+                            self.repo.find_commit(self.repo.head()?.target().unwrap())?;
+                        let message = "Merge changes from remote branch with ours strategy";
+                        self.repo.commit(
+                            Some("HEAD"),
+                            &signature,
+                            &signature,
+                            message,
+                            &tree,
+                            &[&parent_commit],
+                        )?;
+
+                        println!("Merge completed successfully with ours strategy.");
+                    }
+                }
             }
         } else {
             println!("Already up to date, no changes to pull.");
