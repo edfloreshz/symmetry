@@ -281,6 +281,10 @@ impl Application for Symmetry {
                                 }
                             }
                         }
+                        symmetry_utils::sync::SyncStatus::RepoNotConfigured => {
+                            self.error = "The repository has not been configured".into();
+                            self.toggle_warning()
+                        }
                     },
                     Err(err) => {
                         self.error = err.to_string();
