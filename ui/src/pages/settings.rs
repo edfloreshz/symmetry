@@ -4,18 +4,30 @@ use cosmic::iced_winit::widget::horizontal_space;
 use cosmic::iced_winit::Length;
 use cosmic::theme::ThemeType;
 use cosmic::widget::settings::{item, view_column, view_section};
+use cosmic::widget::toggler;
 use cosmic::{Element, Theme};
+use symmetry_core::configuration::repository_type::RepositoryType;
+use symmetry_core::sync::providers::config::crdt::CrdtConfig;
+use symmetry_core::sync::providers::config::git::GitConfig;
 
 use super::Page;
 
 #[derive(Default)]
 pub struct State {
     pub theme: ThemeType,
+    services: Services,
+}
+
+#[derive(Debug, Default)]
+struct Services {
+    git: GitConfig,
+    crdt: CrdtConfig,
 }
 
 #[derive(Debug, Clone)]
 pub enum Message {
     ChangeTheme(ThemeType),
+    ToggleService(RepositoryType, bool),
 }
 
 pub enum Output {
@@ -41,7 +53,10 @@ impl State {
                     .spacing(10),
                 ))
                 .into(),
-        ]);
+            view_section("Sync Services")
+                .add(item("Git", row![horizontal_space(Length::Fill), toggler(None, self.services.git.enabled, |state| Message::ToggleService(RepositoryType::Git, state))]))
+                .add(item("CRDT", row![horizontal_space(Length::Fill), toggler(None, self.services.crdt.enabled, |state| Message::ToggleService(RepositoryType::Git, state))])).into()
+            ]);
         preferences.into()
     }
 
@@ -56,6 +71,16 @@ impl State {
                 };
                 Some(Output::ChangeTheme(theme))
             }
+            Message::ToggleService(service, state) => match service {
+                RepositoryType::Git => {
+                    self.services.git.enabled = state;
+                    todo!("Configure Git repository.")
+                }
+                RepositoryType::Crdt => {
+                    self.services.crdt.enabled = state;
+                    todo!("Configure CRDT repository.")
+                }
+            },
         }
     }
 }

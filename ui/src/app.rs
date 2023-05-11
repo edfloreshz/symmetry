@@ -59,6 +59,7 @@ pub fn refresh_sync_provider() -> Option<SyncProvider> {
     let sync: Option<SyncProvider> = if let Some(configuration) = Configuration::current() {
         match configuration.repo {
             RepositoryType::Git => Some(Box::new(GitSync::new())),
+            RepositoryType::Crdt => todo!(),
         }
     } else {
         None
