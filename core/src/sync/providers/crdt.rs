@@ -20,7 +20,7 @@ impl Synchronization for CRDTSync {
 
     fn handle(&self, message: Self::Message) -> Result<()> {
         match message {
-           Message::Update => todo!(),
+            Message::Update => todo!(),
         }
     }
 }

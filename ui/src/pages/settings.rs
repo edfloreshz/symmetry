@@ -54,8 +54,8 @@ impl State {
                 ))
                 .into(),
             view_section("Sync Services")
-                .add(item("Git", row![horizontal_space(Length::Fill), toggler(None, self.services.git.enabled, |state| Message::ToggleService(RepositoryType::Git, state))]))
-                .add(item("CRDT", row![horizontal_space(Length::Fill), toggler(None, self.services.crdt.enabled, |state| Message::ToggleService(RepositoryType::Git, state))])).into()
+                .add(item("Git", row![horizontal_space(Length::Fill), toggler(Some("Git is a free and open source distributed version control system".into()), self.services.git.enabled, |state| Message::ToggleService(RepositoryType::Git, state))]))
+                .add(item("CRDT", row![horizontal_space(Length::Fill), toggler(Some("Allows multiple devices to collaborate without conflicts".into()), self.services.crdt.enabled, |state| Message::ToggleService(RepositoryType::Git, state))])).into()
             ]);
         preferences.into()
     }
