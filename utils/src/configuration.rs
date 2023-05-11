@@ -3,12 +3,13 @@ use std::{io::Write, path::PathBuf};
 use anyhow::{Context, Result};
 use git2::Repository;
 use git2_credentials::CredentialHandler;
+use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
 
 use crate::{color_scheme::ColorScheme, sync};
 
 pub const APP_NAME: &str = "symmetry";
-pub const CONFIG_PATH: &str = "symmetry/configuration.toml";
+pub const CONFIG_PATH: &str = "symmetry/configuration.ron";
 
 #[derive(Debug, Default, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct Configuration {
@@ -32,7 +33,7 @@ impl Configuration {
             return None;
         }
         if let Ok(data) = std::fs::read_to_string(data_dir.unwrap().join(CONFIG_PATH)) {
-            return match toml::from_str(data.as_str()) {
+            return match ron::from_str(data.as_str()) {
                 Ok(config) => Some(config),
                 Err(err) => {
                     eprintln!("{err}");
@@ -60,7 +61,7 @@ impl Configuration {
     /// Creates a new instance from a path.
     pub fn from(path: PathBuf) -> Self {
         let data = std::fs::read_to_string(path).unwrap();
-        let config: Configuration = toml::from_str(data.as_str()).unwrap();
+        let config: Configuration = ron::from_str(data.as_str()).unwrap();
         config
     }
 
@@ -113,7 +114,7 @@ impl Configuration {
     /// ```
     pub fn write(&self) -> Result<()> {
         let config_file_dir = dirs::data_dir().unwrap().join(CONFIG_PATH);
-        let config = toml::to_string(self)?;
+        let config = ron::ser::to_string_pretty(self, PrettyConfig::new().struct_names(true))?;
         let mut file = std::fs::File::create(&config_file_dir)?;
         file.write_all(config.as_bytes())?;
         Ok(())
