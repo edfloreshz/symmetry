@@ -3,8 +3,8 @@ use cosmic::iced_winit::svg::Handle;
 use cosmic::iced_winit::widget::Svg;
 use cosmic::iced_winit::Alignment;
 use cosmic::Element;
-use symmetry_utils::configuration::Configuration;
-use symmetry_utils::resources::Resources;
+use symmetry_core::configuration::Configuration;
+use symmetry_core::resources::Resources;
 
 use crate::app::refresh_sync_provider;
 

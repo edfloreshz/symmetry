@@ -8,8 +8,8 @@ use cosmic::iced::widget::text;
 use cosmic::widget::scrollable;
 use cosmic::widget::settings::view_column;
 use cosmic::Element;
-use symmetry_utils::color_scheme::ColorScheme;
-use symmetry_utils::configuration::Configuration;
+use symmetry_core::color_scheme::ColorScheme;
+use symmetry_core::configuration::Configuration;
 
 #[derive(Debug, Default)]
 pub struct State {

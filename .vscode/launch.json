@@ -44,16 +44,16 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in library 'symmetry_utils'",
+            "name": "Debug unit tests in library 'symmetry_core'",
             "cargo": {
                 "args": [
                     "test",
                     "--no-run",
                     "--lib",
-                    "--package=symmetry_utils"
+                    "--package=symmetry_core"
                 ],
                 "filter": {
-                    "name": "symmetry_utils",
+                    "name": "symmetry_core",
                     "kind": "lib"
                 }
             },
@@ -68,7 +68,7 @@
                 "args": [
                     "build",
                     "--example=write",
-                    "--package=symmetry_utils"
+                    "--package=symmetry_core"
                 ],
                 "filter": {
                     "name": "write",
@@ -87,7 +87,7 @@
                     "test",
                     "--no-run",
                     "--example=write",
-                    "--package=symmetry_utils"
+                    "--package=symmetry_core"
                 ],
                 "filter": {
                     "name": "write",

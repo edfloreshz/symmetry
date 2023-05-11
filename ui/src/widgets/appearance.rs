@@ -4,7 +4,7 @@ use cosmic::{
     widget::settings::{item, view_section},
     Element,
 };
-use symmetry_utils::color_scheme::ColorScheme;
+use symmetry_core::color_scheme::ColorScheme;
 
 use crate::pages::desktop::Message;
 

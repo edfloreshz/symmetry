@@ -74,8 +74,8 @@ impl Configuration {
     /// Example:
     /// ```rust
     /// use anyhow::Result;
-    /// use symmetry_utils::color_scheme::ColorScheme;
-    /// use symmetry_utils::configuration::Configuration;
+    /// use symmetry_core::color_scheme::ColorScheme;
+    /// use symmetry_core::configuration::Configuration;
     ///
     /// fn main() -> Result<()> {
     ///     let mut config = Configuration::new();
@@ -105,8 +105,8 @@ impl Configuration {
     /// Example:
     /// ```rust
     /// use anyhow::Result;
-    /// use symmetry_utils::color_scheme::ColorScheme;
-    /// use symmetry_utils::configuration::Configuration;
+    /// use symmetry_core::color_scheme::ColorScheme;
+    /// use symmetry_core::configuration::Configuration;
     ///
     /// fn main() -> Result<()> {
     ///     let mut config = Configuration::new();

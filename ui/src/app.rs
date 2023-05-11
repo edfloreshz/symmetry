@@ -11,11 +11,11 @@ use cosmic::widget::segmented_button::{self, Entity, SingleSelectModel};
 use cosmic::widget::{nav_bar, text, IconSource};
 use cosmic::{iced, Element, Theme};
 use iced::Length;
-use symmetry_utils::configuration::repository_type::RepositoryType;
-use symmetry_utils::configuration::Configuration;
-use symmetry_utils::sync;
-use symmetry_utils::sync::providers::git::GitSync;
-use symmetry_utils::traits::synchronization::Synchronization;
+use symmetry_core::configuration::repository_type::RepositoryType;
+use symmetry_core::configuration::Configuration;
+use symmetry_core::sync;
+use symmetry_core::sync::providers::git::GitSync;
+use symmetry_core::traits::synchronization::Synchronization;
 
 static WINDOW_WIDTH: AtomicU32 = AtomicU32::new(1000);
 const BREAK_POINT: u32 = 700;
@@ -24,7 +24,7 @@ type SyncProvider =
     Box<dyn Synchronization<Status = sync::status::Status, Message = sync::message::Message>>;
 
 pub struct Symmetry {
-    pub theme: Theme,
+    theme: Theme,
     nav_bar: SingleSelectModel,
     nav_id_to_page: segmented_button::SecondaryMap<Page>,
     page: Page,

@@ -4,13 +4,13 @@
             "type": "cargo",
             "name": "Run Symmetry UI",
             "cargoArgs": ["run", "--release"],
-            "workingDir": "ui/",
+            "workingDir": "ui/"
         },
         {
             "type": "cargo",
-            "name": "Test Symmetry Utils",
+            "name": "Test Symmetry core",
             "cargoArgs": ["test"],
-            "workingDir": "utils/",
-        },
+            "workingDir": "core/"
+        }
     ]
 }
