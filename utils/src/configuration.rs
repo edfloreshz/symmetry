@@ -5,7 +5,7 @@ use git2::Repository;
 use git2_credentials::CredentialHandler;
 use serde::{Deserialize, Serialize};
 
-use crate::color_scheme::ColorScheme;
+use crate::{color_scheme::ColorScheme, sync};
 
 pub const APP_NAME: &str = "symmetry";
 pub const CONFIG_PATH: &str = "symmetry/configuration.toml";
@@ -14,6 +14,7 @@ pub const CONFIG_PATH: &str = "symmetry/configuration.toml";
 pub struct Configuration {
     pub color_scheme: ColorScheme,
     pub wallpaper: String,
+    pub repo: sync::Repository,
 }
 
 impl Configuration {

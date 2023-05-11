@@ -3,33 +3,25 @@ use git2::{BranchType, MergeOptions, PushOptions, Repository, Signature, StatusO
 use git2_credentials::CredentialHandler;
 use native_dialog::{MessageDialog, MessageType};
 
-use crate::configuration::Configuration;
+use crate::{configuration::Configuration, traits::synchronization::Synchronization};
 
-pub struct SyncManager {
+use super::{Status, SyncMessage};
+
+pub struct GitSync {
     repo: Option<Repository>,
 }
 
-impl Default for SyncManager {
+impl Default for GitSync {
     fn default() -> Self {
         Self::new()
     }
 }
 
-pub enum SyncStatus {
-    UpToDate,
-    ChangesUploaded,
-    NewChangesDetected,
-    RepoNotConfigured,
-}
+impl Synchronization for GitSync {
+    type Status = Status;
+    type Message = SyncMessage;
 
-impl SyncManager {
-    pub fn new() -> Self {
-        let path = Configuration::local_path().unwrap();
-        let repo = Repository::open(path).ok();
-        Self { repo }
-    }
-
-    pub fn sync(&self) -> Result<SyncStatus> {
+    fn sync(&self) -> Result<Self::Status> {
         if let Some(repo) = self.repo.as_ref() {
             let mut options = StatusOptions::new();
             options.include_untracked(true);
@@ -39,17 +31,31 @@ impl SyncManager {
                 self.pull()?;
                 self.commit()?;
                 self.push()?;
-                SyncStatus::ChangesUploaded
+                Status::ChangesUploaded
             } else if self.updates_pending()? {
-                SyncStatus::NewChangesDetected
+                Status::NewChangesDetected
             } else {
-                SyncStatus::UpToDate
+                Status::UpToDate
             };
 
             Ok(status)
         } else {
-            Ok(SyncStatus::RepoNotConfigured)
+            Ok(Status::RepoNotConfigured)
         }
+    }
+
+    fn handle(&self, message: Self::Message) -> Result<()> {
+        match message {
+            SyncMessage::Update => self.pull(),
+        }
+    }
+}
+
+impl GitSync {
+    pub fn new() -> Self {
+        let path = Configuration::local_path().unwrap();
+        let repo = Repository::open(path).ok();
+        Self { repo }
     }
 
     fn commit(&self) -> Result<()> {

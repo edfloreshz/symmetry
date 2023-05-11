@@ -14,12 +14,13 @@ use cosmic::widget::{nav_bar, text, IconSource};
 use cosmic::{iced, Element, Theme};
 use iced::Length;
 use symmetry_utils::configuration::Configuration;
-use symmetry_utils::sync::SyncManager;
+use symmetry_utils::sync::git::GitSync;
+use symmetry_utils::sync::{Status, SyncMessage};
+use symmetry_utils::traits::synchronization::Synchronization;
 
 static WINDOW_WIDTH: AtomicU32 = AtomicU32::new(1000);
 const BREAK_POINT: u32 = 700;
 
-#[derive(Default)]
 pub struct Symmetry {
     pub theme: Theme,
     nav_bar: SingleSelectModel,
@@ -29,7 +30,38 @@ pub struct Symmetry {
     show_warning: bool,
     desktop: crate::pages::desktop::State,
     welcome: crate::pages::welcome::State,
-    sync: SyncManager,
+    sync: Option<Box<dyn Synchronization<Status = Status, Message = SyncMessage>>>,
+}
+
+impl Default for Symmetry {
+    fn default() -> Self {
+        let sync = update_sync_provider();
+
+        Self {
+            theme: Default::default(),
+            nav_bar: Default::default(),
+            nav_id_to_page: Default::default(),
+            page: Default::default(),
+            error: Default::default(),
+            show_warning: Default::default(),
+            desktop: Default::default(),
+            welcome: Default::default(),
+            sync,
+        }
+    }
+}
+
+fn update_sync_provider() -> Option<Box<dyn Synchronization<Status = Status, Message = SyncMessage>>>
+{
+    let sync: Option<Box<dyn Synchronization<Status = Status, Message = SyncMessage>>> =
+        if let Some(configuration) = Configuration::current() {
+            match configuration.repo {
+                symmetry_utils::sync::Repository::Git => Some(Box::new(GitSync::new())),
+            }
+        } else {
+            None
+        };
+    sync
 }
 
 impl Symmetry {
@@ -190,7 +222,10 @@ impl Application for Symmetry {
                 Some(welcome::Output::Initialize(repository)) => {
                     let config = Configuration::new();
                     match config.init(repository) {
-                        Ok(_) => self.error = "Configuration created".to_string(),
+                        Ok(_) => {
+                            self.error = "Configuration created".to_string();
+                            update_sync_provider();
+                        }
                         Err(err) => self.error = err.to_string(),
                     }
                     self.toggle_warning()
@@ -258,37 +293,39 @@ impl Application for Symmetry {
             Message::Error(error) => eprintln!("{error}"),
             Message::CondensedViewToggle => {}
             Message::Sync => {
-                match self.sync.sync() {
-                    Ok(status) => match status {
-                        symmetry_utils::sync::SyncStatus::UpToDate => {
-                            self.error = "Already up to date.".into();
-                            self.toggle_warning()
-                        }
-                        symmetry_utils::sync::SyncStatus::ChangesUploaded => {
-                            self.error = "Successfully synchronized.".into();
-                            self.toggle_warning()
-                        }
-                        symmetry_utils::sync::SyncStatus::NewChangesDetected => {
-                            // todo!("Check if there are conflicts, if not, pull changes");
-                            match self.sync.pull() {
-                                Ok(_) => {
-                                    self.error = "Latest changes downloaded.".into();
-                                    self.toggle_warning()
-                                }
-                                Err(err) => {
-                                    self.error = format!("An error ocurred while trying to get the latest changes: {}.", err).into();
-                                    self.toggle_warning()
+                if let Some(sync) = self.sync.as_ref() {
+                    match sync.sync() {
+                        Ok(status) => match status {
+                            symmetry_utils::sync::Status::UpToDate => {
+                                self.error = "Already up to date.".into();
+                                self.toggle_warning()
+                            }
+                            symmetry_utils::sync::Status::ChangesUploaded => {
+                                self.error = "Successfully synchronized.".into();
+                                self.toggle_warning()
+                            }
+                            symmetry_utils::sync::Status::NewChangesDetected => {
+                                // todo!("Check if there are conflicts, if not, pull changes");
+                                match sync.handle(SyncMessage::Update) {
+                                    Ok(_) => {
+                                        self.error = "Latest changes downloaded.".into();
+                                        self.toggle_warning()
+                                    }
+                                    Err(err) => {
+                                        self.error = format!("An error ocurred while trying to get the latest changes: {}.", err).into();
+                                        self.toggle_warning()
+                                    }
                                 }
                             }
-                        }
-                        symmetry_utils::sync::SyncStatus::RepoNotConfigured => {
-                            self.error = "The repository has not been configured".into();
+                            symmetry_utils::sync::Status::RepoNotConfigured => {
+                                self.error = "The repository has not been configured".into();
+                                self.toggle_warning()
+                            }
+                        },
+                        Err(err) => {
+                            self.error = err.to_string();
                             self.toggle_warning()
                         }
-                    },
-                    Err(err) => {
-                        self.error = err.to_string();
-                        self.toggle_warning()
                     }
                 }
             }
