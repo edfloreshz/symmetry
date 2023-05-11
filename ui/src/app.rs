@@ -1,9 +1,7 @@
 use std::sync::atomic::{AtomicU32, Ordering};
 
-use crate::pages::{desktop, welcome, Page};
+use crate::pages::{desktop, settings, welcome, Page};
 use crate::widgets::header_bar::header;
-use ashpd::desktop::file_chooser::OpenFileRequest;
-use ashpd::WindowIdentifier;
 use cosmic::iced::Application;
 use cosmic::iced_winit::widget::horizontal_space;
 use cosmic::iced_winit::window::{self, close, drag, minimize, toggle_maximize};
@@ -13,13 +11,17 @@ use cosmic::widget::segmented_button::{self, Entity, SingleSelectModel};
 use cosmic::widget::{nav_bar, text, IconSource};
 use cosmic::{iced, Element, Theme};
 use iced::Length;
+use symmetry_utils::configuration::repository_type::RepositoryType;
 use symmetry_utils::configuration::Configuration;
-use symmetry_utils::sync::git::GitSync;
-use symmetry_utils::sync::{Status, SyncMessage};
+use symmetry_utils::sync;
+use symmetry_utils::sync::providers::git::GitSync;
 use symmetry_utils::traits::synchronization::Synchronization;
 
 static WINDOW_WIDTH: AtomicU32 = AtomicU32::new(1000);
 const BREAK_POINT: u32 = 700;
+
+type SyncProvider =
+    Box<dyn Synchronization<Status = sync::status::Status, Message = sync::message::Message>>;
 
 pub struct Symmetry {
     pub theme: Theme,
@@ -28,14 +30,15 @@ pub struct Symmetry {
     page: Page,
     error: String,
     show_warning: bool,
-    desktop: crate::pages::desktop::State,
     welcome: crate::pages::welcome::State,
-    sync: Option<Box<dyn Synchronization<Status = Status, Message = SyncMessage>>>,
+    desktop: crate::pages::desktop::State,
+    settings: crate::pages::settings::State,
+    sync: Option<SyncProvider>,
 }
 
 impl Default for Symmetry {
     fn default() -> Self {
-        let sync = update_sync_provider();
+        let sync = refresh_sync_provider();
 
         Self {
             theme: Default::default(),
@@ -44,23 +47,22 @@ impl Default for Symmetry {
             page: Default::default(),
             error: Default::default(),
             show_warning: Default::default(),
-            desktop: Default::default(),
             welcome: Default::default(),
+            desktop: Default::default(),
+            settings: Default::default(),
             sync,
         }
     }
 }
 
-fn update_sync_provider() -> Option<Box<dyn Synchronization<Status = Status, Message = SyncMessage>>>
-{
-    let sync: Option<Box<dyn Synchronization<Status = Status, Message = SyncMessage>>> =
-        if let Some(configuration) = Configuration::current() {
-            match configuration.repo {
-                symmetry_utils::sync::Repository::Git => Some(Box::new(GitSync::new())),
-            }
-        } else {
-            None
-        };
+pub fn refresh_sync_provider() -> Option<SyncProvider> {
+    let sync: Option<SyncProvider> = if let Some(configuration) = Configuration::current() {
+        match configuration.repo {
+            RepositoryType::Git => Some(Box::new(GitSync::new())),
+        }
+    } else {
+        None
+    };
     sync
 }
 
@@ -97,14 +99,14 @@ impl Symmetry {
 #[derive(Debug, Clone)]
 pub enum Message {
     CondensedViewToggle,
-    ThemeChanged(ThemeType),
-    Desktop(desktop::Message),
     Welcome(welcome::Message),
-    SwitchColorScheme,
+    Desktop(desktop::Message),
+    Settings(settings::Message),
     HandlePickedFile(Vec<String>),
     NavBar(Entity),
-    ToggleWarning,
     Error(String),
+    SwitchColorScheme,
+    ToggleWarning,
     Maximize,
     Minimize,
     Close,
@@ -171,7 +173,7 @@ impl Application for Symmetry {
         let page: Element<_> = match self.page {
             Page::Welcome => self.welcome.view().map(Message::Welcome),
             Page::Desktop => self.desktop.view(&self).map(Message::Desktop),
-            Page::Settings => crate::pages::settings::view(&self),
+            Page::Settings => self.settings.view(&self).map(Message::Settings),
         };
 
         let mut widgets: Vec<Element<_>> = vec![
@@ -199,69 +201,28 @@ impl Application for Symmetry {
 
     fn update(&mut self, message: Self::Message) -> cosmic::iced::Command<Self::Message> {
         match message {
-            Message::ThemeChanged(theme) => {
-                self.theme = match theme {
-                    ThemeType::Dark => Theme::dark(),
-                    ThemeType::Light => Theme::light(),
-                    ThemeType::HighContrastDark => Theme::dark_hc(),
-                    ThemeType::HighContrastLight => Theme::light_hc(),
-                }
-            }
+            Message::Drag => return drag(window::Id::new(0)),
+            Message::Close => return close(window::Id::new(0)),
+            Message::Minimize => return minimize(window::Id::new(0), true),
+            Message::Maximize => return toggle_maximize(window::Id::new(0)),
+            Message::ToggleWarning => self.toggle_warning(),
             Message::NavBar(key) => {
                 if let Some(page) = self.nav_id_to_page.get(key).copied() {
                     self.nav_bar.activate(key);
                     self.page(page);
                 }
             }
-            Message::Drag => return drag(window::Id::new(0)),
-            Message::Close => return close(window::Id::new(0)),
-            Message::Minimize => return minimize(window::Id::new(0), true),
-            Message::Maximize => return toggle_maximize(window::Id::new(0)),
-            Message::ToggleWarning => self.toggle_warning(),
             Message::Welcome(message) => match self.welcome.update(message) {
-                Some(welcome::Output::Initialize(repository)) => {
-                    let config = Configuration::new();
-                    match config.init(repository) {
-                        Ok(_) => {
-                            self.error = "Configuration created".to_string();
-                            update_sync_provider();
-                        }
-                        Err(err) => self.error = err.to_string(),
-                    }
-                    self.toggle_warning()
+                Some(welcome::Output::Message(message)) => {
+                    self.update(Message::Error(message));
+                }
+                Some(welcome::Output::Error(error)) => {
+                    self.update(Message::Error(error));
                 }
                 None => (),
             },
             Message::Desktop(message) => match self.desktop.update(message) {
-                Some(desktop::Output::WallpaperInputChanged(path)) => {
-                    let config = Configuration::current();
-                    if let Some(mut config) = config {
-                        config.wallpaper = path;
-                        match config.write() {
-                            Ok(_) => self.error = "Wallpaper path updated".to_string(),
-                            Err(err) => self.error = err.to_string(),
-                        }
-                    }
-                }
-                Some(desktop::Output::ColorSchemeChanged(color_scheme)) => {
-                    let config = Configuration::current();
-                    if let Some(mut config) = config {
-                        config.color_scheme = color_scheme;
-                        match config.write() {
-                            Ok(_) => self.error = "Color scheme updated".to_string(),
-                            Err(err) => self.error = err.to_string(),
-                        }
-                    }
-                }
-                Some(desktop::Output::OpenFilePicker) => {
-                    let request = OpenFileRequest::default()
-                        .directory(false)
-                        .identifier(Some(WindowIdentifier::None))
-                        .modal(true)
-                        .title("Select your wallpaper")
-                        .multiple(false)
-                        .accept_label("Pick wallpaper");
-
+                Some(desktop::Output::OpenFilePicker(request)) => {
                     return Command::perform(request.send(), |response| match response {
                         Ok(request) => match request.response() {
                             Ok(files) => {
@@ -274,6 +235,16 @@ impl Application for Symmetry {
                         Err(err) => Message::Error(err.to_string()),
                     });
                 }
+                Some(desktop::Output::Error(msg)) => {
+                    self.update(Message::Error(msg));
+                }
+                Some(desktop::Output::Message(msg)) => {
+                    self.update(Message::Error(msg));
+                }
+                None => (),
+            },
+            Message::Settings(message) => match self.settings.update(message) {
+                Some(settings::Output::ChangeTheme(theme)) => self.theme = theme,
                 None => (),
             },
             Message::SwitchColorScheme => {
@@ -290,41 +261,46 @@ impl Application for Symmetry {
                     .update(desktop::Message::WallpaperChanged(file.clone()));
                 self.update(Message::Desktop(desktop::Message::WallpaperChanged(file)));
             }
-            Message::Error(error) => eprintln!("{error}"),
+            Message::Error(error) => {
+                self.error = error;
+                if !self.show_warning {
+                    self.toggle_warning()
+                }
+            }
             Message::CondensedViewToggle => {}
             Message::Sync => {
                 if let Some(sync) = self.sync.as_ref() {
                     match sync.sync() {
                         Ok(status) => match status {
-                            symmetry_utils::sync::Status::UpToDate => {
-                                self.error = "Already up to date.".into();
-                                self.toggle_warning()
+                            sync::status::Status::UpToDate => {
+                                self.update(Message::Error("Already up to date".into()));
                             }
-                            symmetry_utils::sync::Status::ChangesUploaded => {
-                                self.error = "Successfully synchronized.".into();
-                                self.toggle_warning()
+                            sync::status::Status::ChangesUploaded => {
+                                self.update(Message::Error("Successfully synchronized".into()));
                             }
-                            symmetry_utils::sync::Status::NewChangesDetected => {
+                            sync::status::Status::NewChangesDetected => {
                                 // todo!("Check if there are conflicts, if not, pull changes");
-                                match sync.handle(SyncMessage::Update) {
+                                match sync.handle(sync::message::Message::Update) {
                                     Ok(_) => {
-                                        self.error = "Latest changes downloaded.".into();
-                                        self.toggle_warning()
+                                        self.update(Message::Error(
+                                            "Latest changes downloaded".into(),
+                                        ));
                                     }
                                     Err(err) => {
-                                        self.error = format!("An error ocurred while trying to get the latest changes: {}.", err).into();
-                                        self.toggle_warning()
+                                        self.update(Message::Error(
+                                            format!("An error ocurred while trying to get the latest changes: {}.", err)
+                                        ));
                                     }
                                 }
                             }
-                            symmetry_utils::sync::Status::RepoNotConfigured => {
-                                self.error = "The repository has not been configured".into();
-                                self.toggle_warning()
+                            sync::status::Status::RepoNotConfigured => {
+                                self.update(Message::Error(
+                                    "The repository has not been configured".into(),
+                                ));
                             }
                         },
                         Err(err) => {
-                            self.error = err.to_string();
-                            self.toggle_warning()
+                            self.update(Message::Error(err.to_string()));
                         }
                     }
                 }

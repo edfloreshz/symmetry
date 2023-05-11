@@ -3,9 +3,11 @@ use git2::{BranchType, MergeOptions, PushOptions, Repository, Signature, StatusO
 use git2_credentials::CredentialHandler;
 use native_dialog::{MessageDialog, MessageType};
 
-use crate::{configuration::Configuration, traits::synchronization::Synchronization};
-
-use super::{Status, SyncMessage};
+use crate::{
+    configuration::Configuration,
+    sync::{message::Message, status::Status},
+    traits::synchronization::Synchronization,
+};
 
 pub struct GitSync {
     repo: Option<Repository>,
@@ -19,7 +21,7 @@ impl Default for GitSync {
 
 impl Synchronization for GitSync {
     type Status = Status;
-    type Message = SyncMessage;
+    type Message = Message;
 
     fn sync(&self) -> Result<Self::Status> {
         if let Some(repo) = self.repo.as_ref() {
@@ -46,7 +48,7 @@ impl Synchronization for GitSync {
 
     fn handle(&self, message: Self::Message) -> Result<()> {
         match message {
-            SyncMessage::Update => self.pull(),
+            Message::Update => self.pull(),
         }
     }
 }

@@ -6,6 +6,8 @@ use cosmic::Element;
 use symmetry_utils::configuration::Configuration;
 use symmetry_utils::resources::Resources;
 
+use crate::app::refresh_sync_provider;
+
 #[derive(Debug, Default)]
 pub struct State {
     repository: String,
@@ -18,7 +20,8 @@ pub enum Message {
 }
 
 pub enum Output {
-    Initialize(String),
+    Message(String),
+    Error(String),
 }
 
 impl State {
@@ -70,11 +73,19 @@ impl State {
     pub fn update(&mut self, message: Message) -> Option<Output> {
         match message {
             Message::Initialize => {
-                if self.repository.is_empty() {
-                    None
-                } else {
-                    Some(Output::Initialize(self.repository.clone()))
+                if !self.repository.is_empty() {
+                    let config = Configuration::new();
+                    match config.init(self.repository.clone()) {
+                        Ok(_) => {
+                            refresh_sync_provider();
+                            Some(Output::Message("Configuration created".into()));
+                        }
+                        Err(err) => {
+                            Some(Output::Error(err.to_string()));
+                        }
+                    }
                 }
+                None
             }
             Message::RepositoryChanged(repo) => {
                 self.repository = repo;
