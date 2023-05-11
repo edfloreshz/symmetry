@@ -5,8 +5,8 @@ use cosmic::{
 };
 
 mod app;
+mod components;
 mod pages;
-mod widgets;
 
 fn main() -> cosmic::iced::Result {
     Symmetry::run(iced_settings())

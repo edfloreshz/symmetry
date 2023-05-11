@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicU32, Ordering};
 
+use crate::components::header_bar::header;
 use crate::pages::{desktop, settings, welcome, Page};
-use crate::widgets::header_bar::header;
 use cosmic::iced::Application;
 use cosmic::iced_winit::widget::horizontal_space;
 use cosmic::iced_winit::window::{self, close, drag, minimize, toggle_maximize};

@@ -1,7 +1,7 @@
 use super::Page;
 use crate::app::Symmetry;
-use crate::widgets::appearance::appearance_section;
-use crate::widgets::wallpaper::wallpaper_section;
+use crate::components::appearance::appearance_section;
+use crate::components::wallpaper::wallpaper_section;
 use ashpd::desktop::file_chooser::OpenFileRequest;
 use ashpd::WindowIdentifier;
 use cosmic::iced::widget::text;
