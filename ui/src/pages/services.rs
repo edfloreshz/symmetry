@@ -43,7 +43,6 @@ pub enum Message {
 }
 
 pub enum Output {
-    Message(String),
     Error(String),
     Sync,
 }
@@ -106,26 +105,37 @@ impl State {
 
     pub fn update(&mut self, message: Message) -> Option<Output> {
         match message {
-            Message::GitUrlChanged(url) => self.service_config.git.url = url,
+            Message::GitUrlChanged(url) => {
+                self.service_config.git.url = url;
+                None
+            }
             Message::InitializeGitRepo => {
                 self.service_config = self.service_config.clone();
                 self.active_service = Service::Git;
+                match self.write_to_config() {
+                    Some(output) => Some(output),
+                    None => Some(Output::Sync),
+                }
             }
             Message::ToggleService(service, state) => match service {
                 Service::Git => {
                     self.service_config.git.enabled = state;
+                    self.write_to_config()
                 }
                 Service::Crdt => {
                     self.service_config.crdt.enabled = state;
-                    todo!("Configure CRDT repository.")
+                    self.write_to_config()
                 }
             },
         }
+    }
+
+    fn write_to_config(&mut self) -> Option<Output> {
         if let Some(mut config) = Configuration::current() {
             config.service_config = self.service_config.clone();
             config.active_service = self.active_service.clone();
             return match config.write() {
-                Ok(_) => Some(Output::Sync),
+                Ok(_) => None,
                 Err(err) => Some(Output::Error(err.to_string())),
             };
         }

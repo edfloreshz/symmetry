@@ -125,19 +125,20 @@ impl Application for Symmetry {
     type Theme = Theme;
 
     fn new(_flags: ()) -> (Self, Command<Self::Message>) {
-        let mut model = Self::default();
-        let config = Configuration::current();
+        let mut config = Configuration::current();
         if config.is_none() {
-            let config = Configuration::new();
-
-            match config.init() {
-                Ok(_) => match config.write() {
+            let new_config = Configuration::new();
+            config = Some(new_config.clone());
+            match new_config.init() {
+                Ok(_) => match new_config.write() {
                     Ok(_) => (),
                     Err(err) => panic!("{}", err.to_string()),
                 },
                 Err(err) => panic!("{}", err.to_string()),
             }
         }
+
+        let mut model = Self::default();
         model.theme = Theme::light();
 
         if let Some(config) = config {
@@ -254,9 +255,6 @@ impl Application for Symmetry {
             Message::Services(message) => match self.services.update(message) {
                 Some(services::Output::Error(error)) => {
                     self.update(Message::Error(error));
-                }
-                Some(services::Output::Message(message)) => {
-                    self.update(Message::Error(message));
                 }
                 Some(services::Output::Sync) => {
                     self.update(Message::Sync);

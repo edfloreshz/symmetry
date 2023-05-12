@@ -3,8 +3,6 @@ pub mod repository_type;
 use std::{io::Write, path::PathBuf};
 
 use anyhow::{Context, Result};
-use git2::Repository;
-use git2_credentials::CredentialHandler;
 use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
 

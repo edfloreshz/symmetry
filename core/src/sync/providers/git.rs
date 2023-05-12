@@ -32,6 +32,7 @@ impl Synchronization for GitSync {
             let branch = repo.find_branch("main", BranchType::Local);
 
             if branch.is_err() && !repo.statuses(Some(&mut options))?.is_empty() {
+                self.configure_remote()?;
                 self.commit()?;
                 self.set_upstream_branch()?;
                 self.force_pull("main")?;
@@ -65,22 +66,26 @@ impl Synchronization for GitSync {
 impl GitSync {
     pub fn new() -> Self {
         let path = Configuration::local_path().unwrap();
-        let repo = Repository::open(path).ok();
+        let repo = match Repository::open(&path) {
+            Ok(repo) => Some(repo),
+            Err(_) => match Repository::init(path) {
+                Ok(repo) => Some(repo),
+                Err(_) => None,
+            },
+        };
         Self { repo }
     }
 
-    // fn config_git_repo(app_config_dir: PathBuf, repository: String) -> Result<(), anyhow::Error> {
-    //     let repo = Repository::init(&app_config_dir)?;
-    //     let mut callbacks = git2::RemoteCallbacks::new();
-    //     let git_config = git2::Config::open_default()?;
-    //     let mut credential_handler = CredentialHandler::new(git_config);
-    //     callbacks.credentials(move |url, username, allowed| {
-    //         credential_handler.try_next_credential(url, username, allowed)
-    //     });
-    //     let mut remote = repo.remote("origin", repository.as_str())?;
-    //     remote.connect_auth(git2::Direction::Push, Some(callbacks), None)?;
-    //     Ok(())
-    // }
+    fn configure_remote(&self) -> Result<()> {
+        if let Some(repo) = self.repo.as_ref() {
+            let config = Configuration::current().unwrap();
+            let url = config.service_config.git.url.as_str();
+            let callbacks = Self::callbacks()?;
+            let mut remote = repo.remote("origin", url)?;
+            remote.connect_auth(git2::Direction::Push, Some(callbacks), None)?;
+        }
+        Ok(())
+    }
 
     fn commit(&self) -> Result<()> {
         if let Some(repo) = self.repo.as_ref() {
