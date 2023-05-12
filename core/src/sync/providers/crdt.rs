@@ -1,3 +1,5 @@
+use std::net::SocketAddr;
+
 use anyhow::Result;
 use crdts;
 
@@ -6,8 +8,11 @@ use crate::{
     sync::{message::Message, status::Status},
     traits::synchronization::Synchronization,
 };
+
+use super::config::crdt::CrdtConfig;
 struct CRDTSync {
-    key: Option<String>,
+    pub config: CrdtConfig,
+    pub peers: Vec<SocketAddr>
 }
 
 impl Synchronization for CRDTSync {
@@ -26,7 +31,7 @@ impl Synchronization for CRDTSync {
 }
 
 impl CRDTSync {
-    pub fn new() -> Self {
-        Self { key: None }
+    pub fn new(config: CrdtConfig) -> Self {
+        Self { config: CrdtConfig { key: todo!(), id: todo!(), enabled: true }, peers: vec![]}
     }
 }
