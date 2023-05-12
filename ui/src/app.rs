@@ -13,6 +13,7 @@ use cosmic::{iced, Element, Theme};
 use iced::Length;
 use symmetry_core::configuration::repository_type::Service;
 use symmetry_core::configuration::Configuration;
+use symmetry_core::platforms::linux::Desktop;
 use symmetry_core::sync;
 use symmetry_core::sync::providers::crdt::CrdtSync;
 use symmetry_core::sync::providers::git::GitSync;
@@ -111,6 +112,7 @@ pub enum Message {
     Error(String),
     SwitchColorScheme,
     ToggleWarning,
+    HandleAsync,
     Maximize,
     Minimize,
     Close,
@@ -326,6 +328,12 @@ impl Application for Symmetry {
                         }
                     }
                 }
+            }
+            Message::HandleAsync => {
+                return Command::perform(Desktop::get_wallpaper(), |result| match result {
+                    Ok(wallpaper) => Message::Error(wallpaper),
+                    Err(err) => Message::Error(err.to_string()),
+                });
             }
         }
         Command::none()

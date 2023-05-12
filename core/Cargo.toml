@@ -16,3 +16,7 @@ git2 = "0.16.0"
 git2_credentials = "0.11.0"
 native-dialog = { git = "https://github.com/edfloreshz/native-dialog-rs", branch = "custom-labels", features = ["windows_dpi_awareness", "windows_visual_styles"] }
 crdts = "7.3.0"
+detect-desktop-environment = "1.0.0"
+zbus = "3.13.0"
+async-trait = "0.1.68"
+configparser = "3.0.2"
