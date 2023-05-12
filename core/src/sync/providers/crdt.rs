@@ -1,7 +1,7 @@
 use std::net::SocketAddr;
 
 use anyhow::Result;
-use crdts;
+use crdts::{self, List};
 
 use crate::{
     configuration::Configuration,
@@ -12,7 +12,10 @@ use crate::{
 use super::config::crdt::CrdtConfig;
 struct CRDTSync {
     pub config: CrdtConfig,
-    pub peers: Vec<SocketAddr>
+    pub peers: Vec<SocketAddr>,
+    pub ops: crdts::List<String, String>,
+    pub curr_setting: crdts::LWWReg<String, i32>
+
 }
 
 impl Synchronization for CRDTSync {
@@ -32,6 +35,6 @@ impl Synchronization for CRDTSync {
 
 impl CRDTSync {
     pub fn new(config: CrdtConfig) -> Self {
-        Self { config: CrdtConfig { key: todo!(), id: todo!(), enabled: true }, peers: vec![]}
+        Self { config, peers: vec![], ops: List::new(), curr_setting: crdts::LWWReg { val: "S".to_string(), marker: 0 }}
     }
 }
