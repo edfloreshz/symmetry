@@ -8,9 +8,9 @@ use git2_credentials::CredentialHandler;
 use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
 
-use crate::color_scheme::ColorScheme;
+use crate::{color_scheme::ColorScheme, sync::providers::config::Services};
 
-use self::repository_type::RepositoryType;
+use self::repository_type::Service;
 
 pub const APP_NAME: &str = "symmetry";
 pub const CONFIG_PATH: &str = "symmetry/configuration.ron";
@@ -19,7 +19,8 @@ pub const CONFIG_PATH: &str = "symmetry/configuration.ron";
 pub struct Configuration {
     pub color_scheme: ColorScheme,
     pub wallpaper: String,
-    pub repo: RepositoryType,
+    pub active_service: Service,
+    pub service_config: Services,
 }
 
 impl Configuration {
@@ -83,19 +84,10 @@ impl Configuration {
     ///     Ok(())
     /// }
     /// ```
-    pub fn init(&self, repository: String) -> Result<()> {
+    pub fn init(&self) -> Result<()> {
         let data_dir = dirs::data_dir().context("Data directory not available.")?;
         let app_config_dir = data_dir.join(APP_NAME);
         std::fs::create_dir_all(&app_config_dir)?;
-        let repo = Repository::init(&app_config_dir)?;
-        let mut callbacks = git2::RemoteCallbacks::new();
-        let git_config = git2::Config::open_default()?;
-        let mut credential_handler = CredentialHandler::new(git_config);
-        callbacks.credentials(move |url, username, allowed| {
-            credential_handler.try_next_credential(url, username, allowed)
-        });
-        let mut remote = repo.remote("origin", repository.as_str())?;
-        remote.connect_auth(git2::Direction::Push, Some(callbacks), None)?;
         std::fs::File::create(data_dir.join(CONFIG_PATH))?;
         Self::write(self)?;
         Ok(())

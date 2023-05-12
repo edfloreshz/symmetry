@@ -1,5 +1,7 @@
 use anyhow::Result;
-use git2::{BranchType, MergeOptions, PushOptions, Repository, Signature, StatusOptions};
+use git2::{
+    BranchType, FetchOptions, MergeOptions, PushOptions, Repository, Signature, StatusOptions,
+};
 use git2_credentials::CredentialHandler;
 use native_dialog::{MessageDialog, MessageType};
 
@@ -27,7 +29,14 @@ impl Synchronization for GitSync {
         if let Some(repo) = self.repo.as_ref() {
             let mut options = StatusOptions::new();
             options.include_untracked(true);
-            self.set_upstream_branch()?;
+            let branch = repo.find_branch("main", BranchType::Local);
+
+            if branch.is_err() && !repo.statuses(Some(&mut options))?.is_empty() {
+                self.commit()?;
+                self.set_upstream_branch()?;
+                self.force_pull("main")?;
+                return Ok(Status::RepoConfigured);
+            }
 
             let status = if !repo.statuses(Some(&mut options))?.is_empty() {
                 self.pull()?;
@@ -59,6 +68,19 @@ impl GitSync {
         let repo = Repository::open(path).ok();
         Self { repo }
     }
+
+    // fn config_git_repo(app_config_dir: PathBuf, repository: String) -> Result<(), anyhow::Error> {
+    //     let repo = Repository::init(&app_config_dir)?;
+    //     let mut callbacks = git2::RemoteCallbacks::new();
+    //     let git_config = git2::Config::open_default()?;
+    //     let mut credential_handler = CredentialHandler::new(git_config);
+    //     callbacks.credentials(move |url, username, allowed| {
+    //         credential_handler.try_next_credential(url, username, allowed)
+    //     });
+    //     let mut remote = repo.remote("origin", repository.as_str())?;
+    //     remote.connect_auth(git2::Direction::Push, Some(callbacks), None)?;
+    //     Ok(())
+    // }
 
     fn commit(&self) -> Result<()> {
         if let Some(repo) = self.repo.as_ref() {
@@ -121,9 +143,9 @@ impl GitSync {
 
     pub fn set_upstream_branch(&self) -> Result<()> {
         if let Some(repo) = self.repo.as_ref() {
-            let branch_name = "main";
+            let mut branch = repo.find_branch("main", BranchType::Local)?;
 
-            let mut branch = repo.find_branch(branch_name, BranchType::Local)?;
+            Self::fetch(repo)?;
 
             // Check if the branch already has an upstream branch
             if branch.upstream().is_err() {
@@ -139,6 +161,31 @@ impl GitSync {
             }
         }
 
+        Ok(())
+    }
+
+    fn fetch(repo: &Repository) -> Result<(), anyhow::Error> {
+        let mut remote = repo.find_remote("origin")?;
+        let mut fetch_options = FetchOptions::new();
+        remote.fetch(&["main"], Some(&mut fetch_options), None)?;
+        Ok(())
+    }
+
+    fn force_pull(&self, branch_name: &str) -> Result<()> {
+        if let Some(repo) = self.repo.as_ref() {
+            let upstream = repo.find_branch("origin/main", BranchType::Remote)?;
+            let refname = format!("refs/heads/{}", branch_name);
+            let mut reference = repo.find_reference(&refname)?;
+            let remote_oid = upstream
+                .get()
+                .target()
+                .ok_or_else(|| git2::Error::from_str("Remote branch has no target (commit)"))?;
+
+            reference.set_target(remote_oid, "Fast-forward")?;
+            repo.set_head(&refname)?;
+            repo.checkout_head(Some(git2::build::CheckoutBuilder::default().force()))?;
+            println!("Pull completed successfully.");
+        }
         Ok(())
     }
 

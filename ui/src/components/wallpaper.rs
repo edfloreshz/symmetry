@@ -9,7 +9,6 @@ use cosmic::{
     widget::{
         icon,
         settings::{item, view_section},
-        IconSource,
     },
     Element,
 };
@@ -37,12 +36,9 @@ pub(crate) fn wallpaper_section<'a>(wallpaper: String) -> Element<'a, Message> {
             row![
                 horizontal_space(Length::Fill),
                 wallpaper_entry,
-                button(
-                    icon(IconSource::from("document-open-symbolic"), 16)
-                        .style(theme::Svg::SymbolicPrimary)
-                )
-                .padding(10)
-                .on_press(Message::OpenFilePicker)
+                button(icon("document-open-symbolic", 16).style(theme::Svg::SymbolicPrimary))
+                    .padding(10)
+                    .on_press(Message::OpenFilePicker)
             ]
             .spacing(10),
         ))

@@ -3,4 +3,5 @@ pub enum Status {
     ChangesUploaded,
     NewChangesDetected,
     RepoNotConfigured,
+    RepoConfigured,
 }

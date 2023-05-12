@@ -1,5 +1,5 @@
-use dark_light::{Mode, detect};
-use serde::{Serialize, Deserialize};
+use dark_light::{detect, Mode};
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Copy, Clone, PartialEq, Eq, Debug)]
 pub enum ColorScheme {
@@ -22,12 +22,12 @@ impl From<Mode> for ColorScheme {
 }
 
 impl ColorScheme {
-    /// Creates a new color scheme based on the currently selected desktop color scheme. 
+    /// Creates a new color scheme based on the currently selected desktop color scheme.
     pub fn new() -> Self {
         detect().into()
     }
 
-    /// Creates a new color scheme based on the currently saved desktop color scheme. 
+    /// Creates a new color scheme based on the currently saved desktop color scheme.
     pub fn current() -> Self {
         todo!("Read from config file.")
     }

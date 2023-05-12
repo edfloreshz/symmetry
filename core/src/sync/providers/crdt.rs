@@ -2,15 +2,14 @@ use anyhow::Result;
 use crdts;
 
 use crate::{
-    configuration::Configuration,
     sync::{message::Message, status::Status},
     traits::synchronization::Synchronization,
 };
-struct CRDTSync {
+pub struct CrdtSync {
     key: Option<String>,
 }
 
-impl Synchronization for CRDTSync {
+impl Synchronization for CrdtSync {
     type Status = Status;
     type Message = Message;
 
@@ -25,7 +24,7 @@ impl Synchronization for CRDTSync {
     }
 }
 
-impl CRDTSync {
+impl CrdtSync {
     pub fn new() -> Self {
         Self { key: None }
     }

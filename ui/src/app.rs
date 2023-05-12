@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicU32, Ordering};
 
 use crate::components::header_bar::header;
-use crate::pages::{desktop, settings, welcome, Page};
+use crate::pages::{desktop, services, settings, Page};
 use cosmic::iced::Application;
 use cosmic::iced_winit::widget::horizontal_space;
 use cosmic::iced_winit::window::{self, close, drag, minimize, toggle_maximize};
@@ -11,9 +11,10 @@ use cosmic::widget::segmented_button::{self, Entity, SingleSelectModel};
 use cosmic::widget::{nav_bar, text, IconSource};
 use cosmic::{iced, Element, Theme};
 use iced::Length;
-use symmetry_core::configuration::repository_type::RepositoryType;
+use symmetry_core::configuration::repository_type::Service;
 use symmetry_core::configuration::Configuration;
 use symmetry_core::sync;
+use symmetry_core::sync::providers::crdt::CrdtSync;
 use symmetry_core::sync::providers::git::GitSync;
 use symmetry_core::traits::synchronization::Synchronization;
 
@@ -32,6 +33,7 @@ pub struct Symmetry {
     show_warning: bool,
     welcome: crate::pages::welcome::State,
     desktop: crate::pages::desktop::State,
+    services: crate::pages::services::State,
     settings: crate::pages::settings::State,
     sync: Option<SyncProvider>,
 }
@@ -49,6 +51,7 @@ impl Default for Symmetry {
             show_warning: Default::default(),
             welcome: Default::default(),
             desktop: Default::default(),
+            services: Default::default(),
             settings: Default::default(),
             sync,
         }
@@ -57,9 +60,9 @@ impl Default for Symmetry {
 
 pub fn refresh_sync_provider() -> Option<SyncProvider> {
     let sync: Option<SyncProvider> = if let Some(configuration) = Configuration::current() {
-        match configuration.repo {
-            RepositoryType::Git => Some(Box::new(GitSync::new())),
-            RepositoryType::Crdt => todo!(),
+        match configuration.active_service {
+            Service::Git => Some(Box::new(GitSync::new())),
+            Service::Crdt => Some(Box::new(CrdtSync::new())),
         }
     } else {
         None
@@ -100,8 +103,8 @@ impl Symmetry {
 #[derive(Debug, Clone)]
 pub enum Message {
     CondensedViewToggle,
-    Welcome(welcome::Message),
     Desktop(desktop::Message),
+    Services(services::Message),
     Settings(settings::Message),
     HandlePickedFile(Vec<String>),
     NavBar(Entity),
@@ -124,6 +127,17 @@ impl Application for Symmetry {
     fn new(_flags: ()) -> (Self, Command<Self::Message>) {
         let mut model = Self::default();
         let config = Configuration::current();
+        if config.is_none() {
+            let config = Configuration::new();
+
+            match config.init() {
+                Ok(_) => match config.write() {
+                    Ok(_) => (),
+                    Err(err) => panic!("{}", err.to_string()),
+                },
+                Err(err) => panic!("{}", err.to_string()),
+            }
+        }
         model.theme = Theme::light();
 
         if let Some(config) = config {
@@ -132,6 +146,7 @@ impl Application for Symmetry {
 
         model.insert_page(Page::Welcome).activate();
         model.insert_page(Page::Desktop);
+        model.insert_page(Page::Services);
         model.insert_page(Page::Settings);
 
         (model, Command::none())
@@ -172,8 +187,9 @@ impl Application for Symmetry {
             .max_width(200)
             .into();
         let page: Element<_> = match self.page {
-            Page::Welcome => self.welcome.view().map(Message::Welcome),
+            Page::Welcome => self.welcome.view(),
             Page::Desktop => self.desktop.view(&self).map(Message::Desktop),
+            Page::Services => self.services.view(&self).map(Message::Services),
             Page::Settings => self.settings.view(&self).map(Message::Settings),
         };
 
@@ -213,15 +229,6 @@ impl Application for Symmetry {
                     self.page(page);
                 }
             }
-            Message::Welcome(message) => match self.welcome.update(message) {
-                Some(welcome::Output::Message(message)) => {
-                    self.update(Message::Error(message));
-                }
-                Some(welcome::Output::Error(error)) => {
-                    self.update(Message::Error(error));
-                }
-                None => (),
-            },
             Message::Desktop(message) => match self.desktop.update(message) {
                 Some(desktop::Output::OpenFilePicker(request)) => {
                     return Command::perform(request.send(), |response| match response {
@@ -241,6 +248,18 @@ impl Application for Symmetry {
                 }
                 Some(desktop::Output::Message(msg)) => {
                     self.update(Message::Error(msg));
+                }
+                None => (),
+            },
+            Message::Services(message) => match self.services.update(message) {
+                Some(services::Output::Error(error)) => {
+                    self.update(Message::Error(error));
+                }
+                Some(services::Output::Message(message)) => {
+                    self.update(Message::Error(message));
+                }
+                Some(services::Output::Sync) => {
+                    self.update(Message::Sync);
                 }
                 None => (),
             },
@@ -270,9 +289,13 @@ impl Application for Symmetry {
             }
             Message::CondensedViewToggle => {}
             Message::Sync => {
+                self.sync = refresh_sync_provider();
                 if let Some(sync) = self.sync.as_ref() {
                     match sync.sync() {
                         Ok(status) => match status {
+                            sync::status::Status::RepoConfigured => {
+                                self.update(Message::Error("Repo configured successfully".into()));
+                            }
                             sync::status::Status::UpToDate => {
                                 self.update(Message::Error("Already up to date".into()));
                             }

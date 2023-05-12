@@ -1,6 +1,8 @@
-#[derive(Debug, Default)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Default, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct GitConfig {
-    url: String,
-    username: String,
+    pub url: String,
+    pub username: String,
     pub enabled: bool,
 }

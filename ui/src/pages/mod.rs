@@ -1,4 +1,5 @@
 pub mod desktop;
+pub mod services;
 pub mod settings;
 pub mod welcome;
 
@@ -7,6 +8,7 @@ pub enum Page {
     #[default]
     Welcome,
     Desktop,
+    Services,
     Settings,
 }
 
@@ -16,6 +18,7 @@ impl Page {
         match self {
             Welcome => "Welcome",
             Desktop => "Desktop",
+            Services => "Services",
             Settings => "Settings",
         }
     }
@@ -25,6 +28,7 @@ impl Page {
         match self {
             Welcome => "face-smile-big-symbolic",
             Desktop => "computer-symbolic",
+            Services => "network-server-symbolic",
             Settings => "preferences-system-symbolic",
         }
     }
