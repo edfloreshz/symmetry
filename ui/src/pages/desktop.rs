@@ -21,11 +21,13 @@ pub struct State {
 pub enum Message {
     WallpaperChanged(String),
     ColorSchemeChanged(ColorScheme),
+    SetCurrentWallpaper,
     OpenFilePicker,
 }
 
 pub enum Output {
     OpenFilePicker(OpenFileRequest),
+    GetCurrentWallpaper,
     Message(String),
     Error(String),
 }
@@ -88,6 +90,7 @@ impl State {
                     .accept_label("Pick wallpaper");
                 Some(Output::OpenFilePicker(request))
             }
+            Message::SetCurrentWallpaper => Some(Output::GetCurrentWallpaper),
         }
     }
 }

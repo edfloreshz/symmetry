@@ -17,6 +17,7 @@ use symmetry_core::platforms::linux::Desktop;
 use symmetry_core::sync;
 use symmetry_core::sync::providers::crdt::CrdtSync;
 use symmetry_core::sync::providers::git::GitSync;
+use symmetry_core::traits::desktop::wallpaper::WallpaperManager;
 use symmetry_core::traits::synchronization::Synchronization;
 
 static WINDOW_WIDTH: AtomicU32 = AtomicU32::new(1000);
@@ -108,11 +109,11 @@ pub enum Message {
     Services(services::Message),
     Settings(settings::Message),
     HandlePickedFile(Vec<String>),
+    HandleCurrentWallpaper(String),
     NavBar(Entity),
     Error(String),
     SwitchColorScheme,
     ToggleWarning,
-    HandleAsync,
     Maximize,
     Minimize,
     Close,
@@ -246,6 +247,12 @@ impl Application for Symmetry {
                         Err(err) => Message::Error(err.to_string()),
                     });
                 }
+                Some(desktop::Output::GetCurrentWallpaper) => {
+                    return Command::perform(Desktop::get_wallpaper(), |response| match response {
+                        Ok(wallpaper) => Message::HandleCurrentWallpaper(wallpaper),
+                        Err(err) => Message::Error(err.to_string()),
+                    });
+                }
                 Some(desktop::Output::Error(msg)) => {
                     self.update(Message::Error(msg));
                 }
@@ -280,6 +287,10 @@ impl Application for Symmetry {
                 self.desktop
                     .update(desktop::Message::WallpaperChanged(file.clone()));
                 self.update(Message::Desktop(desktop::Message::WallpaperChanged(file)));
+            }
+            Message::HandleCurrentWallpaper(wallpaper) => {
+                self.desktop
+                    .update(desktop::Message::WallpaperChanged(wallpaper));
             }
             Message::Error(error) => {
                 self.error = error;
@@ -328,12 +339,6 @@ impl Application for Symmetry {
                         }
                     }
                 }
-            }
-            Message::HandleAsync => {
-                return Command::perform(Desktop::get_wallpaper(), |result| match result {
-                    Ok(wallpaper) => Message::Error(wallpaper),
-                    Err(err) => Message::Error(err.to_string()),
-                });
             }
         }
         Command::none()

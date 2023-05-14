@@ -36,6 +36,9 @@ pub(crate) fn wallpaper_section<'a>(wallpaper: String) -> Element<'a, Message> {
             row![
                 horizontal_space(Length::Fill),
                 wallpaper_entry,
+                button(icon("computer-symbolic", 16).style(theme::Svg::SymbolicPrimary))
+                    .padding(10)
+                    .on_press(Message::SetCurrentWallpaper),
                 button(icon("document-open-symbolic", 16).style(theme::Svg::SymbolicPrimary))
                     .padding(10)
                     .on_press(Message::OpenFilePicker)
